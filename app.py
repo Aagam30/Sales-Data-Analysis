@@ -1,6 +1,6 @@
 # =====================================
 # Sales Data Analysis Dashboard
-# (No Login / No Signup)
+# Dark/Light Theme + ML Forecasting
 # =====================================
 
 import os
@@ -10,7 +10,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # -------------------------------------
-# Page Configuration
+# THEME TOGGLE (UI)
+# -------------------------------------
+st.sidebar.header("🎨 Appearance")
+
+theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
+
+if theme == "Dark":
+    st.markdown(
+        """
+        <style>
+        body { background-color: #0e1117; color: white; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# -------------------------------------
+# PAGE CONFIG
 # -------------------------------------
 st.set_page_config(
     page_title="Sales Analysis Dashboard",
@@ -19,10 +36,10 @@ st.set_page_config(
 )
 
 st.title("📊 Sales Data Analysis Dashboard")
-st.markdown("Interactive sales analytics using Python, Pandas, NumPy & Matplotlib")
+st.markdown("Interactive sales analytics with forecasting")
 
 # -------------------------------------
-# Sidebar: Data Source
+# DATA SOURCE
 # -------------------------------------
 st.sidebar.header("📁 Data Source")
 
@@ -31,9 +48,6 @@ data_mode = st.sidebar.radio(
     ["Use default dataset", "Upload your own file"]
 )
 
-# -------------------------------------
-# Load Data
-# -------------------------------------
 if data_mode == "Upload your own file":
     uploaded_file = st.sidebar.file_uploader(
         "Upload CSV or Excel",
@@ -41,168 +55,126 @@ if data_mode == "Upload your own file":
     )
 
     if uploaded_file is None:
-        st.info("👈 Please upload a file to start analysis.")
+        st.info("👈 Upload a file to start")
         st.stop()
 
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
+    df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
 
 else:
     if not os.path.exists("sales_data.csv"):
-        st.error("❌ Default dataset (sales_data.csv) not found.")
+        st.error("❌ sales_data.csv not found")
         st.stop()
-
     df = pd.read_csv("sales_data.csv")
-    st.success("✅ Using default dataset (sales_data.csv)")
+    st.success("✅ Using default dataset")
 
 # -------------------------------------
-# Data Preparation
+# DATA PREPARATION
 # -------------------------------------
 df["Date"] = pd.to_datetime(df["Date"])
 df["Revenue"] = df["Quantity"] * df["Price"]
 df["Profit"] = (df["Price"] - df["Cost"]) * df["Quantity"]
-df["Month"] = df["Date"].dt.month_name()
+df["Month"] = df["Date"].dt.to_period("M")
 
 # -------------------------------------
-# Sidebar Filters
+# FILTERS
 # -------------------------------------
 st.sidebar.header("🔍 Filters")
 
-date_range = st.sidebar.date_input(
-    "Select Date Range",
-    [df["Date"].min(), df["Date"].max()]
-)
-
 category_filter = st.sidebar.multiselect(
-    "Select Category",
+    "Category",
     df["Category"].unique(),
     default=df["Category"].unique()
 )
 
-product_filter = st.sidebar.multiselect(
-    "Select Product",
-    df["Product"].unique(),
-    default=df["Product"].unique()
-)
-
-filtered_df = df[
-    (df["Date"] >= pd.to_datetime(date_range[0])) &
-    (df["Date"] <= pd.to_datetime(date_range[1])) &
-    (df["Category"].isin(category_filter)) &
-    (df["Product"].isin(product_filter))
-]
+filtered_df = df[df["Category"].isin(category_filter)]
 
 # -------------------------------------
 # KPIs
 # -------------------------------------
-st.subheader("📌 Key Performance Indicators")
+st.subheader("📌 Key Metrics")
 
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("💰 Total Revenue", f"₹{filtered_df['Revenue'].sum():,.0f}")
-col2.metric("📈 Total Profit", f"₹{filtered_df['Profit'].sum():,.0f}")
-col3.metric("📦 Total Orders", len(filtered_df))
-col4.metric("📊 Avg Order Value", f"₹{filtered_df['Revenue'].mean():,.0f}")
+c1, c2, c3 = st.columns(3)
+c1.metric("💰 Revenue", f"₹{filtered_df['Revenue'].sum():,.0f}")
+c2.metric("📈 Profit", f"₹{filtered_df['Profit'].sum():,.0f}")
+c3.metric("📦 Orders", len(filtered_df))
 
 # -------------------------------------
-# Sales Trends
+# MONTHLY SALES TREND
 # -------------------------------------
-st.subheader("📈 Sales Trends")
+st.subheader("📈 Monthly Revenue Trend")
 
-col5, col6 = st.columns(2)
+monthly_sales = filtered_df.groupby("Month")["Revenue"].sum()
 
-with col5:
-    monthly_sales = filtered_df.groupby("Month")["Revenue"].sum()
-    fig, ax = plt.subplots()
-    ax.plot(monthly_sales.index, monthly_sales.values, marker="o")
-    ax.set_title("Monthly Revenue Trend")
-    ax.set_xlabel("Month")
-    ax.set_ylabel("Revenue")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
-
-with col6:
-    category_sales = filtered_df.groupby("Category")["Revenue"].sum()
-    fig, ax = plt.subplots()
-    ax.pie(category_sales.values, labels=category_sales.index, autopct="%1.1f%%")
-    ax.set_title("Revenue by Category")
-    st.pyplot(fig)
+fig, ax = plt.subplots()
+ax.plot(monthly_sales.index.astype(str), monthly_sales.values, marker="o")
+ax.set_xlabel("Month")
+ax.set_ylabel("Revenue")
+ax.set_title("Monthly Revenue")
+plt.xticks(rotation=45)
+st.pyplot(fig)
 
 # -------------------------------------
-# Product Performance
+# ML FORECASTING (LINEAR REGRESSION)
 # -------------------------------------
-st.subheader("📦 Product Performance")
+st.subheader("🤖 Sales Forecast (Next 3 Months)")
 
-col7, col8 = st.columns(2)
+# Prepare data
+X = np.arange(len(monthly_sales))
+y = monthly_sales.values
 
-with col7:
-    product_revenue = filtered_df.groupby("Product")["Revenue"].sum()
-    fig, ax = plt.subplots()
-    ax.bar(product_revenue.index, product_revenue.values)
-    ax.set_title("Revenue by Product")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+# Train model (simple linear regression)
+coef = np.polyfit(X, y, 1)
 
-with col8:
-    product_profit = filtered_df.groupby("Product")["Profit"].sum()
-    fig, ax = plt.subplots()
-    ax.bar(product_profit.index, product_profit.values)
-    ax.axhline(0)
-    ax.set_title("Profit / Loss by Product")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+# Predict future
+future_X = np.arange(len(X), len(X) + 3)
+future_y = coef[0] * future_X + coef[1]
 
-# -------------------------------------
-# Top Products
-# -------------------------------------
-st.subheader("🏆 Top 5 Products by Profit")
-
-top_products = (
-    filtered_df.groupby("Product")["Profit"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(5)
+future_months = pd.period_range(
+    start=monthly_sales.index[-1] + 1,
+    periods=3,
+    freq="M"
 )
 
-st.dataframe(top_products)
+forecast_df = pd.DataFrame({
+    "Month": future_months.astype(str),
+    "Forecasted Revenue": future_y.astype(int)
+})
+
+st.dataframe(forecast_df)
+
+# Forecast Plot
+fig2, ax2 = plt.subplots()
+ax2.plot(monthly_sales.index.astype(str), y, label="Actual", marker="o")
+ax2.plot(future_months.astype(str), future_y, label="Forecast", marker="x")
+ax2.set_title("Actual vs Forecasted Revenue")
+ax2.legend()
+plt.xticks(rotation=45)
+st.pyplot(fig2)
 
 # -------------------------------------
-# Loss Analysis
+# PRODUCT PROFIT ANALYSIS
 # -------------------------------------
-st.subheader("⚠ Loss-Making Transactions")
+st.subheader("📦 Product Profit / Loss")
 
-loss_df = filtered_df[filtered_df["Profit"] < 0]
+product_profit = filtered_df.groupby("Product")["Profit"].sum()
 
-if loss_df.empty:
-    st.success("✅ No loss-making transactions found")
-else:
-    st.warning("❌ Loss-making transactions detected")
-    st.dataframe(loss_df)
-
-# -------------------------------------
-# Raw Data
-# -------------------------------------
-with st.expander("📄 View Filtered Raw Data"):
-    st.dataframe(filtered_df)
+fig3, ax3 = plt.subplots()
+ax3.bar(product_profit.index, product_profit.values)
+ax3.axhline(0)
+ax3.set_ylabel("Profit")
+plt.xticks(rotation=45)
+st.pyplot(fig3)
 
 # -------------------------------------
-# Download Data
+# DOWNLOAD DATA
 # -------------------------------------
-st.subheader("⬇ Download Filtered Data")
+st.subheader("⬇ Download Data")
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
-st.download_button(
-    "Download CSV",
-    csv,
-    "filtered_sales_data.csv",
-    "text/csv"
-)
+st.download_button("Download CSV", csv, "filtered_sales_data.csv", "text/csv")
 
 # -------------------------------------
-# Footer
+# FOOTER
 # -------------------------------------
 st.markdown("---")
-st.markdown("✅ Built with **Python, Pandas, NumPy, Matplotlib & Streamlit**")
-
+st.markdown("✅ Built with Python, Pandas, NumPy, Matplotlib & Streamlit")
