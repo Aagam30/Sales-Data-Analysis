@@ -1,6 +1,6 @@
 # =====================================
 # Sales Data Analysis Dashboard
-# Light/Dark Theme + Forecasting + Accuracy
+# Improved Forecasting Accuracy
 # =====================================
 
 import os
@@ -18,65 +18,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# -------------------------------------
-# THEME HANDLER
-# -------------------------------------
-def apply_theme(theme):
-    if theme == "Dark":
-        st.markdown(
-            """
-            <style>
-            .stApp { background-color: #0e1117; color: white; }
-            section[data-testid="stSidebar"] { background-color: #161b22; }
-            div[data-testid="metric-container"] {
-                background-color: #1f2933;
-                padding: 15px;
-                border-radius: 10px;
-                color: white;
-            }
-            .stButton>button {
-                background-color: #238636;
-                color: white;
-                border-radius: 8px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            """
-            <style>
-            .stApp { background-color: white; color: black; }
-            section[data-testid="stSidebar"] { background-color: #f0f2f6; }
-            div[data-testid="metric-container"] {
-                background-color: #ffffff;
-                padding: 15px;
-                border-radius: 10px;
-                color: black;
-            }
-            .stButton>button {
-                background-color: #4CAF50;
-                color: white;
-                border-radius: 8px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-# -------------------------------------
-# SIDEBAR: THEME
-# -------------------------------------
-st.sidebar.header("🎨 Appearance")
-theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
-apply_theme(theme)
-
-# -------------------------------------
-# TITLE
-# -------------------------------------
 st.title("📊 Sales Data Analysis Dashboard")
-st.markdown("Interactive sales analytics with forecasting and accuracy metrics")
+st.markdown("Sales analytics with improved forecasting accuracy")
 
 # -------------------------------------
 # SIDEBAR: DATA SOURCE
@@ -104,6 +47,7 @@ else:
     if not os.path.exists("sales_data.csv"):
         st.error("❌ sales_data.csv not found in repository.")
         st.stop()
+
     df = pd.read_csv("sales_data.csv")
     st.success("✅ Using default dataset")
 
@@ -140,11 +84,11 @@ c3.metric("📦 Orders", len(filtered_df))
 c4.metric("📊 Avg Order Value", f"₹{filtered_df['Revenue'].mean():,.0f}")
 
 # -------------------------------------
-# MONTHLY SALES
+# MONTHLY SALES AGGREGATION
 # -------------------------------------
-st.subheader("📈 Monthly Revenue Trend")
-
 monthly_sales = filtered_df.groupby("Month")["Revenue"].sum()
+
+st.subheader("📈 Monthly Revenue Trend")
 
 fig, ax = plt.subplots()
 ax.plot(monthly_sales.index.astype(str), monthly_sales.values, marker="o")
@@ -155,17 +99,31 @@ plt.xticks(rotation=45)
 st.pyplot(fig)
 
 # -------------------------------------
-# FORECASTING (LINEAR REGRESSION)
+# IMPROVED FORECASTING (POLYNOMIAL REGRESSION)
 # -------------------------------------
-st.subheader("🤖 Sales Forecast (Next 3 Months)")
+st.subheader("🤖 Sales Forecast (Improved Accuracy)")
 
+# Prepare data
 X = np.arange(len(monthly_sales))
 y = monthly_sales.values
 
-coef = np.polyfit(X, y, 1)
+# Train/Test Split (80/20)
+split = int(len(X) * 0.8)
+X_train, X_test = X[:split], X[split:]
+y_train, y_test = y[:split], y[split:]
 
+# Polynomial Regression (degree = 2)
+degree = 2
+coef = np.polyfit(X_train, y_train, degree)
+model = np.poly1d(coef)
+
+# Predictions
+y_train_pred = model(X_train)
+y_test_pred = model(X_test)
+
+# Forecast next 3 months
 future_X = np.arange(len(X), len(X) + 3)
-future_y = coef[0] * future_X + coef[1]
+future_y = model(future_X)
 
 future_months = pd.period_range(
     start=monthly_sales.index[-1] + 1,
@@ -180,25 +138,27 @@ forecast_df = pd.DataFrame({
 
 st.dataframe(forecast_df)
 
-# Forecast Plot
+# -------------------------------------
+# FORECAST VISUALIZATION
+# -------------------------------------
 fig2, ax2 = plt.subplots()
 ax2.plot(monthly_sales.index.astype(str), y, label="Actual", marker="o")
-ax2.plot(future_months.astype(str), future_y, label="Forecast", marker="x")
-ax2.set_title("Actual vs Forecasted Revenue")
+ax2.plot(monthly_sales.index[:split].astype(str), y_train_pred, label="Train Fit", linestyle="--")
+ax2.plot(monthly_sales.index[split:].astype(str), y_test_pred, label="Test Prediction", marker="x")
+ax2.plot(future_months.astype(str), future_y, label="Forecast", marker="D")
+ax2.set_title("Actual vs Predicted vs Forecasted Revenue")
 ax2.legend()
 plt.xticks(rotation=45)
 st.pyplot(fig2)
 
 # -------------------------------------
-# FORECAST ACCURACY METRICS
+# FORECAST ACCURACY METRICS (ON TEST DATA)
 # -------------------------------------
-st.subheader("📏 Forecast Accuracy Metrics")
+st.subheader("📏 Forecast Accuracy Metrics (Test Data)")
 
-y_pred = coef[0] * X + coef[1]
-
-mae = np.mean(np.abs(y - y_pred))
-rmse = np.sqrt(np.mean((y - y_pred) ** 2))
-mape = np.mean(np.abs((y - y_pred) / y)) * 100
+mae = np.mean(np.abs(y_test - y_test_pred))
+rmse = np.sqrt(np.mean((y_test - y_test_pred) ** 2))
+mape = np.mean(np.abs((y_test - y_test_pred) / y_test)) * 100
 
 m1, m2, m3 = st.columns(3)
 m1.metric("MAE (₹)", f"{mae:,.0f}")
@@ -206,7 +166,7 @@ m2.metric("RMSE (₹)", f"{rmse:,.0f}")
 m3.metric("MAPE (%)", f"{mape:.2f}%")
 
 # -------------------------------------
-# PRODUCT PROFIT
+# PRODUCT PROFIT ANALYSIS
 # -------------------------------------
 st.subheader("📦 Product Profit / Loss")
 
