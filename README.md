@@ -38,5 +38,5 @@ You can access the deployed application directly using the above link without an
 
 ---
 
-## 📂 Project Structure
+
 
