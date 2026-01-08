@@ -1,15 +1,16 @@
-# ===============================
-# Advanced Sales Data Analysis App
-# ===============================
+# =====================================
+# Sales Data Analysis Dashboard
+# =====================================
 
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# -------------------------------
-# Page Config
-# -------------------------------
+# -------------------------------------
+# Page Configuration
+# -------------------------------------
 st.set_page_config(
     page_title="Sales Analysis Dashboard",
     page_icon="📊",
@@ -17,41 +18,55 @@ st.set_page_config(
 )
 
 st.title("📊 Sales Data Analysis Dashboard")
-st.markdown("Analyze sales performance, profit & trends interactively")
+st.markdown("Interactive sales analytics using Python, Pandas, NumPy & Matplotlib")
 
-# -------------------------------
-# Sidebar – File Upload
-# -------------------------------
-st.sidebar.header("📁 Upload Data")
+# -------------------------------------
+# Sidebar: Data Source Selection
+# -------------------------------------
+st.sidebar.header("📁 Data Source")
 
-uploaded_file = st.sidebar.file_uploader(
-    "Upload CSV or Excel file",
-    type=["csv", "xlsx"]
+data_mode = st.sidebar.radio(
+    "Choose data source:",
+    ["Use default dataset", "Upload your own file"]
 )
 
-if uploaded_file is None:
-    st.info("👈 Please upload a CSV or Excel file to start analysis.")
-    st.stop()
+# -------------------------------------
+# Load Data Safely
+# -------------------------------------
+if data_mode == "Upload your own file":
+    uploaded_file = st.sidebar.file_uploader(
+        "Upload CSV or Excel file",
+        type=["csv", "xlsx"]
+    )
 
-# -------------------------------
-# Load Data
-# -------------------------------
-if uploaded_file.name.endswith(".csv"):
-    df = pd.read_csv(uploaded_file)
+    if uploaded_file is None:
+        st.info("👈 Please upload a file to start analysis.")
+        st.stop()
+
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+
 else:
-    df = pd.read_excel(uploaded_file)
+    if not os.path.exists("sales_data.csv"):
+        st.error("❌ Default dataset (sales_data.csv) not found in repository.")
+        st.stop()
 
-# -------------------------------
+    df = pd.read_csv("sales_data.csv")
+    st.success("✅ Using default dataset (sales_data.csv)")
+
+# -------------------------------------
 # Data Preparation
-# -------------------------------
+# -------------------------------------
 df["Date"] = pd.to_datetime(df["Date"])
 df["Revenue"] = df["Quantity"] * df["Price"]
 df["Profit"] = (df["Price"] - df["Cost"]) * df["Quantity"]
 df["Month"] = df["Date"].dt.month_name()
 
-# -------------------------------
-# Sidebar – Filters
-# -------------------------------
+# -------------------------------------
+# Sidebar Filters
+# -------------------------------------
 st.sidebar.header("🔍 Filters")
 
 date_range = st.sidebar.date_input(
@@ -60,13 +75,13 @@ date_range = st.sidebar.date_input(
 )
 
 category_filter = st.sidebar.multiselect(
-    "Category",
+    "Select Category",
     options=df["Category"].unique(),
     default=df["Category"].unique()
 )
 
 product_filter = st.sidebar.multiselect(
-    "Product",
+    "Select Product",
     options=df["Product"].unique(),
     default=df["Product"].unique()
 )
@@ -78,9 +93,9 @@ filtered_df = df[
     (df["Product"].isin(product_filter))
 ]
 
-# -------------------------------
-# KPI Section
-# -------------------------------
+# -------------------------------------
+# KPIs
+# -------------------------------------
 st.subheader("📌 Key Performance Indicators")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -90,9 +105,9 @@ col2.metric("📈 Total Profit", f"₹{np.sum(filtered_df['Profit']):,.0f}")
 col3.metric("📦 Total Orders", len(filtered_df))
 col4.metric("📊 Avg Order Value", f"₹{np.mean(filtered_df['Revenue']):,.0f}")
 
-# -------------------------------
-# Charts Row 1
-# -------------------------------
+# -------------------------------------
+# Sales Trends
+# -------------------------------------
 st.subheader("📈 Sales Trends")
 
 col5, col6 = st.columns(2)
@@ -114,9 +129,9 @@ with col6:
     ax.set_title("Revenue by Category")
     st.pyplot(fig)
 
-# -------------------------------
-# Charts Row 2
-# -------------------------------
+# -------------------------------------
+# Product Performance
+# -------------------------------------
 st.subheader("📦 Product Performance")
 
 col7, col8 = st.columns(2)
@@ -130,17 +145,17 @@ with col7:
     st.pyplot(fig)
 
 with col8:
-    profit_data = filtered_df.groupby("Product")["Profit"].sum()
+    product_profit = filtered_df.groupby("Product")["Profit"].sum()
     fig, ax = plt.subplots()
-    ax.bar(profit_data.index, profit_data.values)
+    ax.bar(product_profit.index, product_profit.values)
     ax.axhline(0)
     ax.set_title("Profit / Loss by Product")
     plt.xticks(rotation=45)
     st.pyplot(fig)
 
-# -------------------------------
-# Top Products Section
-# -------------------------------
+# -------------------------------------
+# Top Products
+# -------------------------------------
 st.subheader("🏆 Top 5 Products by Profit")
 
 top_products = (
@@ -152,9 +167,9 @@ top_products = (
 
 st.dataframe(top_products)
 
-# -------------------------------
-# Loss Detection
-# -------------------------------
+# -------------------------------------
+# Loss Analysis
+# -------------------------------------
 st.subheader("⚠ Loss-Making Transactions")
 
 loss_df = filtered_df[filtered_df["Profit"] < 0]
@@ -165,15 +180,15 @@ else:
     st.warning("❌ Loss-making transactions detected")
     st.dataframe(loss_df)
 
-# -------------------------------
-# Raw Data View
-# -------------------------------
+# -------------------------------------
+# Raw Data
+# -------------------------------------
 with st.expander("📄 View Filtered Raw Data"):
     st.dataframe(filtered_df)
 
-# -------------------------------
-# Download Button
-# -------------------------------
+# -------------------------------------
+# Download Data
+# -------------------------------------
 st.subheader("⬇ Download Filtered Data")
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
@@ -184,10 +199,8 @@ st.download_button(
     "text/csv"
 )
 
-# -------------------------------
+# -------------------------------------
 # Footer
-# -------------------------------
+# -------------------------------------
 st.markdown("---")
-st.markdown(
-    "✅ Built with **Python, Pandas, NumPy, Matplotlib & Streamlit**"
-)
+st.markdown("✅ Built with **Python, Pandas, NumPy, Matplotlib & Streamlit**")
