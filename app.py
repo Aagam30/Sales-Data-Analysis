@@ -1,6 +1,6 @@
 # =====================================
 # Sales Data Analysis Dashboard
-# Dark/Light Theme + ML Forecasting
+# Light/Dark Theme + Forecasting + Accuracy
 # =====================================
 
 import os
@@ -8,98 +8,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-def apply_theme(theme):
-    if theme == "Dark":
-        st.markdown(
-            """
-            <style>
-            /* Main background */
-            .stApp {
-                background-color: #0e1117;
-                color: #ffffff;
-            }
-
-            /* Sidebar */
-            section[data-testid="stSidebar"] {
-                background-color: #161b22;
-            }
-
-            /* Metric cards */
-            div[data-testid="metric-container"] {
-                background-color: #1f2933;
-                border-radius: 10px;
-                padding: 15px;
-                color: white;
-            }
-
-            /* Dataframe */
-            .stDataFrame {
-                background-color: #1f2933;
-            }
-
-            /* Buttons */
-            .stButton>button {
-                background-color: #238636;
-                color: white;
-                border-radius: 8px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-    else:  # Light theme
-        st.markdown(
-            """
-            <style>
-            .stApp {
-                background-color: #ffffff;
-                color: #000000;
-            }
-
-            section[data-testid="stSidebar"] {
-                background-color: #f0f2f6;
-            }
-
-            div[data-testid="metric-container"] {
-                background-color: #ffffff;
-                border-radius: 10px;
-                padding: 15px;
-                color: black;
-            }
-
-            .stButton>button {
-                background-color: #4CAF50;
-                color: white;
-                border-radius: 8px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-st.sidebar.header("🎨 Appearance")
-theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
-apply_theme(theme)
-
-
-# -------------------------------------
-# THEME TOGGLE (UI)
-# -------------------------------------
-st.sidebar.header("🎨 Appearance")
-
-theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
-
-if theme == "Dark":
-    st.markdown(
-        """
-        <style>
-        body { background-color: #0e1117; color: white; }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
 # -------------------------------------
 # PAGE CONFIG
@@ -110,11 +18,68 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Sales Data Analysis Dashboard")
-st.markdown("Interactive sales analytics with forecasting")
+# -------------------------------------
+# THEME HANDLER
+# -------------------------------------
+def apply_theme(theme):
+    if theme == "Dark":
+        st.markdown(
+            """
+            <style>
+            .stApp { background-color: #0e1117; color: white; }
+            section[data-testid="stSidebar"] { background-color: #161b22; }
+            div[data-testid="metric-container"] {
+                background-color: #1f2933;
+                padding: 15px;
+                border-radius: 10px;
+                color: white;
+            }
+            .stButton>button {
+                background-color: #238636;
+                color: white;
+                border-radius: 8px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            """
+            <style>
+            .stApp { background-color: white; color: black; }
+            section[data-testid="stSidebar"] { background-color: #f0f2f6; }
+            div[data-testid="metric-container"] {
+                background-color: #ffffff;
+                padding: 15px;
+                border-radius: 10px;
+                color: black;
+            }
+            .stButton>button {
+                background-color: #4CAF50;
+                color: white;
+                border-radius: 8px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
 # -------------------------------------
-# DATA SOURCE
+# SIDEBAR: THEME
+# -------------------------------------
+st.sidebar.header("🎨 Appearance")
+theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
+apply_theme(theme)
+
+# -------------------------------------
+# TITLE
+# -------------------------------------
+st.title("📊 Sales Data Analysis Dashboard")
+st.markdown("Interactive sales analytics with forecasting and accuracy metrics")
+
+# -------------------------------------
+# SIDEBAR: DATA SOURCE
 # -------------------------------------
 st.sidebar.header("📁 Data Source")
 
@@ -130,14 +95,14 @@ if data_mode == "Upload your own file":
     )
 
     if uploaded_file is None:
-        st.info("👈 Upload a file to start")
+        st.info("👈 Upload a file to start analysis.")
         st.stop()
 
     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
 
 else:
     if not os.path.exists("sales_data.csv"):
-        st.error("❌ sales_data.csv not found")
+        st.error("❌ sales_data.csv not found in repository.")
         st.stop()
     df = pd.read_csv("sales_data.csv")
     st.success("✅ Using default dataset")
@@ -166,15 +131,16 @@ filtered_df = df[df["Category"].isin(category_filter)]
 # -------------------------------------
 # KPIs
 # -------------------------------------
-st.subheader("📌 Key Metrics")
+st.subheader("📌 Key Performance Indicators")
 
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 c1.metric("💰 Revenue", f"₹{filtered_df['Revenue'].sum():,.0f}")
 c2.metric("📈 Profit", f"₹{filtered_df['Profit'].sum():,.0f}")
 c3.metric("📦 Orders", len(filtered_df))
+c4.metric("📊 Avg Order Value", f"₹{filtered_df['Revenue'].mean():,.0f}")
 
 # -------------------------------------
-# MONTHLY SALES TREND
+# MONTHLY SALES
 # -------------------------------------
 st.subheader("📈 Monthly Revenue Trend")
 
@@ -184,23 +150,20 @@ fig, ax = plt.subplots()
 ax.plot(monthly_sales.index.astype(str), monthly_sales.values, marker="o")
 ax.set_xlabel("Month")
 ax.set_ylabel("Revenue")
-ax.set_title("Monthly Revenue")
+ax.set_title("Monthly Revenue Trend")
 plt.xticks(rotation=45)
 st.pyplot(fig)
 
 # -------------------------------------
-# ML FORECASTING (LINEAR REGRESSION)
+# FORECASTING (LINEAR REGRESSION)
 # -------------------------------------
 st.subheader("🤖 Sales Forecast (Next 3 Months)")
 
-# Prepare data
 X = np.arange(len(monthly_sales))
 y = monthly_sales.values
 
-# Train model (simple linear regression)
 coef = np.polyfit(X, y, 1)
 
-# Predict future
 future_X = np.arange(len(X), len(X) + 3)
 future_y = coef[0] * future_X + coef[1]
 
@@ -227,7 +190,23 @@ plt.xticks(rotation=45)
 st.pyplot(fig2)
 
 # -------------------------------------
-# PRODUCT PROFIT ANALYSIS
+# FORECAST ACCURACY METRICS
+# -------------------------------------
+st.subheader("📏 Forecast Accuracy Metrics")
+
+y_pred = coef[0] * X + coef[1]
+
+mae = np.mean(np.abs(y - y_pred))
+rmse = np.sqrt(np.mean((y - y_pred) ** 2))
+mape = np.mean(np.abs((y - y_pred) / y)) * 100
+
+m1, m2, m3 = st.columns(3)
+m1.metric("MAE (₹)", f"{mae:,.0f}")
+m2.metric("RMSE (₹)", f"{rmse:,.0f}")
+m3.metric("MAPE (%)", f"{mape:.2f}%")
+
+# -------------------------------------
+# PRODUCT PROFIT
 # -------------------------------------
 st.subheader("📦 Product Profit / Loss")
 
@@ -241,9 +220,22 @@ plt.xticks(rotation=45)
 st.pyplot(fig3)
 
 # -------------------------------------
+# LOSS TRANSACTIONS
+# -------------------------------------
+st.subheader("⚠ Loss-Making Transactions")
+
+loss_df = filtered_df[filtered_df["Profit"] < 0]
+
+if loss_df.empty:
+    st.success("✅ No loss-making transactions")
+else:
+    st.warning("❌ Loss-making transactions detected")
+    st.dataframe(loss_df)
+
+# -------------------------------------
 # DOWNLOAD DATA
 # -------------------------------------
-st.subheader("⬇ Download Data")
+st.subheader("⬇ Download Filtered Data")
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download CSV", csv, "filtered_sales_data.csv", "text/csv")
@@ -252,4 +244,4 @@ st.download_button("Download CSV", csv, "filtered_sales_data.csv", "text/csv")
 # FOOTER
 # -------------------------------------
 st.markdown("---")
-st.markdown("✅ Built with Python, Pandas, NumPy, Matplotlib & Streamlit")
+st.markdown("✅ Built with **Python, Pandas, NumPy, Matplotlib & Streamlit**")
