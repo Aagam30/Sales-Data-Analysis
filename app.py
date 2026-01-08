@@ -9,6 +9,81 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+def apply_theme(theme):
+    if theme == "Dark":
+        st.markdown(
+            """
+            <style>
+            /* Main background */
+            .stApp {
+                background-color: #0e1117;
+                color: #ffffff;
+            }
+
+            /* Sidebar */
+            section[data-testid="stSidebar"] {
+                background-color: #161b22;
+            }
+
+            /* Metric cards */
+            div[data-testid="metric-container"] {
+                background-color: #1f2933;
+                border-radius: 10px;
+                padding: 15px;
+                color: white;
+            }
+
+            /* Dataframe */
+            .stDataFrame {
+                background-color: #1f2933;
+            }
+
+            /* Buttons */
+            .stButton>button {
+                background-color: #238636;
+                color: white;
+                border-radius: 8px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+    else:  # Light theme
+        st.markdown(
+            """
+            <style>
+            .stApp {
+                background-color: #ffffff;
+                color: #000000;
+            }
+
+            section[data-testid="stSidebar"] {
+                background-color: #f0f2f6;
+            }
+
+            div[data-testid="metric-container"] {
+                background-color: #ffffff;
+                border-radius: 10px;
+                padding: 15px;
+                color: black;
+            }
+
+            .stButton>button {
+                background-color: #4CAF50;
+                color: white;
+                border-radius: 8px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+st.sidebar.header("🎨 Appearance")
+theme = st.sidebar.radio("Choose Theme", ["Light", "Dark"])
+apply_theme(theme)
+
+
 # -------------------------------------
 # THEME TOGGLE (UI)
 # -------------------------------------
