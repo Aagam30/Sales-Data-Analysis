@@ -1,10 +1,6 @@
 # =====================================
-# Sales Data Analysis Dashboard (Advanced)
-# Features:
-# 1. Login Authentication
-# 2. Default CSV / Upload Support
-# 3. Sales Forecasting
-# 4. PDF Report Export
+# Sales Data Analysis Dashboard
+# (No Login / No Signup)
 # =====================================
 
 import os
@@ -12,10 +8,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from fpdf import FPDF
 
 # -------------------------------------
-# PAGE CONFIG
+# Page Configuration
 # -------------------------------------
 st.set_page_config(
     page_title="Sales Analysis Dashboard",
@@ -23,41 +18,11 @@ st.set_page_config(
     layout="wide"
 )
 
-# -------------------------------------
-# SIMPLE AUTHENTICATION
-# -------------------------------------
-USERS = {
-    "admin": "admin123",
-    "user": "user123"
-}
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.title("🔐 Login to Sales Dashboard")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username in USERS and USERS[username] == password:
-            st.session_state.logged_in = True
-            st.success("✅ Login successful")
-            st.rerun()
-        else:
-            st.error("❌ Invalid credentials")
-
-    st.stop()
-
-# -------------------------------------
-# MAIN APP
-# -------------------------------------
 st.title("📊 Sales Data Analysis Dashboard")
-st.markdown("Advanced analytics with forecasting & reporting")
+st.markdown("Interactive sales analytics using Python, Pandas, NumPy & Matplotlib")
 
 # -------------------------------------
-# SIDEBAR: DATA SOURCE
+# Sidebar: Data Source
 # -------------------------------------
 st.sidebar.header("📁 Data Source")
 
@@ -66,6 +31,9 @@ data_mode = st.sidebar.radio(
     ["Use default dataset", "Upload your own file"]
 )
 
+# -------------------------------------
+# Load Data
+# -------------------------------------
 if data_mode == "Upload your own file":
     uploaded_file = st.sidebar.file_uploader(
         "Upload CSV or Excel",
@@ -73,7 +41,7 @@ if data_mode == "Upload your own file":
     )
 
     if uploaded_file is None:
-        st.info("👈 Upload a file to continue")
+        st.info("👈 Please upload a file to start analysis.")
         st.stop()
 
     if uploaded_file.name.endswith(".csv"):
@@ -83,152 +51,158 @@ if data_mode == "Upload your own file":
 
 else:
     if not os.path.exists("sales_data.csv"):
-        st.error("❌ sales_data.csv not found in repository")
+        st.error("❌ Default dataset (sales_data.csv) not found.")
         st.stop()
 
     df = pd.read_csv("sales_data.csv")
-    st.success("✅ Using default sales_data.csv")
+    st.success("✅ Using default dataset (sales_data.csv)")
 
 # -------------------------------------
-# DATA PREPARATION
+# Data Preparation
 # -------------------------------------
 df["Date"] = pd.to_datetime(df["Date"])
 df["Revenue"] = df["Quantity"] * df["Price"]
 df["Profit"] = (df["Price"] - df["Cost"]) * df["Quantity"]
-df["Month"] = df["Date"].dt.to_period("M")
+df["Month"] = df["Date"].dt.month_name()
 
 # -------------------------------------
-# FILTERS
+# Sidebar Filters
 # -------------------------------------
 st.sidebar.header("🔍 Filters")
 
+date_range = st.sidebar.date_input(
+    "Select Date Range",
+    [df["Date"].min(), df["Date"].max()]
+)
+
 category_filter = st.sidebar.multiselect(
-    "Category",
+    "Select Category",
     df["Category"].unique(),
     default=df["Category"].unique()
 )
 
-filtered_df = df[df["Category"].isin(category_filter)]
+product_filter = st.sidebar.multiselect(
+    "Select Product",
+    df["Product"].unique(),
+    default=df["Product"].unique()
+)
+
+filtered_df = df[
+    (df["Date"] >= pd.to_datetime(date_range[0])) &
+    (df["Date"] <= pd.to_datetime(date_range[1])) &
+    (df["Category"].isin(category_filter)) &
+    (df["Product"].isin(product_filter))
+]
 
 # -------------------------------------
 # KPIs
 # -------------------------------------
 st.subheader("📌 Key Performance Indicators")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
+
 col1.metric("💰 Total Revenue", f"₹{filtered_df['Revenue'].sum():,.0f}")
 col2.metric("📈 Total Profit", f"₹{filtered_df['Profit'].sum():,.0f}")
 col3.metric("📦 Total Orders", len(filtered_df))
+col4.metric("📊 Avg Order Value", f"₹{filtered_df['Revenue'].mean():,.0f}")
 
 # -------------------------------------
-# SALES TREND
+# Sales Trends
 # -------------------------------------
-st.subheader("📈 Monthly Revenue Trend")
+st.subheader("📈 Sales Trends")
 
-monthly_sales = filtered_df.groupby("Month")["Revenue"].sum()
+col5, col6 = st.columns(2)
 
-fig, ax = plt.subplots()
-ax.plot(monthly_sales.index.astype(str), monthly_sales.values, marker="o")
-ax.set_xlabel("Month")
-ax.set_ylabel("Revenue")
-ax.set_title("Monthly Revenue Trend")
-plt.xticks(rotation=45)
-st.pyplot(fig)
+with col5:
+    monthly_sales = filtered_df.groupby("Month")["Revenue"].sum()
+    fig, ax = plt.subplots()
+    ax.plot(monthly_sales.index, monthly_sales.values, marker="o")
+    ax.set_title("Monthly Revenue Trend")
+    ax.set_xlabel("Month")
+    ax.set_ylabel("Revenue")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+with col6:
+    category_sales = filtered_df.groupby("Category")["Revenue"].sum()
+    fig, ax = plt.subplots()
+    ax.pie(category_sales.values, labels=category_sales.index, autopct="%1.1f%%")
+    ax.set_title("Revenue by Category")
+    st.pyplot(fig)
 
 # -------------------------------------
-# SALES FORECASTING (SIMPLE)
+# Product Performance
 # -------------------------------------
-st.subheader("🔮 Sales Forecast (Next 3 Months)")
+st.subheader("📦 Product Performance")
 
-x = np.arange(len(monthly_sales))
-y = monthly_sales.values
+col7, col8 = st.columns(2)
 
-coef = np.polyfit(x, y, 1)
-forecast_x = np.arange(len(x), len(x) + 3)
-forecast_y = coef[0] * forecast_x + coef[1]
+with col7:
+    product_revenue = filtered_df.groupby("Product")["Revenue"].sum()
+    fig, ax = plt.subplots()
+    ax.bar(product_revenue.index, product_revenue.values)
+    ax.set_title("Revenue by Product")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
 
-forecast_months = pd.period_range(
-    start=monthly_sales.index[-1] + 1,
-    periods=3,
-    freq="M"
+with col8:
+    product_profit = filtered_df.groupby("Product")["Profit"].sum()
+    fig, ax = plt.subplots()
+    ax.bar(product_profit.index, product_profit.values)
+    ax.axhline(0)
+    ax.set_title("Profit / Loss by Product")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+# -------------------------------------
+# Top Products
+# -------------------------------------
+st.subheader("🏆 Top 5 Products by Profit")
+
+top_products = (
+    filtered_df.groupby("Product")["Profit"]
+    .sum()
+    .sort_values(ascending=False)
+    .head(5)
 )
 
-forecast_df = pd.DataFrame({
-    "Month": forecast_months.astype(str),
-    "Forecasted Revenue": forecast_y.astype(int)
-})
-
-st.dataframe(forecast_df)
+st.dataframe(top_products)
 
 # -------------------------------------
-# PROFIT / LOSS CHART
+# Loss Analysis
 # -------------------------------------
-st.subheader("⚠ Profit vs Loss by Product")
+st.subheader("⚠ Loss-Making Transactions")
 
-product_profit = filtered_df.groupby("Product")["Profit"].sum()
+loss_df = filtered_df[filtered_df["Profit"] < 0]
 
-fig2, ax2 = plt.subplots()
-ax2.bar(product_profit.index, product_profit.values)
-ax2.axhline(0)
-ax2.set_ylabel("Profit")
-ax2.set_title("Profit / Loss by Product")
-plt.xticks(rotation=45)
-st.pyplot(fig2)
+if loss_df.empty:
+    st.success("✅ No loss-making transactions found")
+else:
+    st.warning("❌ Loss-making transactions detected")
+    st.dataframe(loss_df)
 
 # -------------------------------------
-# PDF REPORT GENERATION
+# Raw Data
 # -------------------------------------
-st.subheader("📄 Export PDF Report")
-
-def generate_pdf():
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-
-    pdf.cell(200, 10, "Sales Analysis Report", ln=True, align="C")
-    pdf.ln(10)
-
-    pdf.cell(200, 10, f"Total Revenue: ₹{filtered_df['Revenue'].sum():,.0f}", ln=True)
-    pdf.cell(200, 10, f"Total Profit: ₹{filtered_df['Profit'].sum():,.0f}", ln=True)
-    pdf.cell(200, 10, f"Total Orders: {len(filtered_df)}", ln=True)
-
-    pdf.ln(10)
-    pdf.cell(200, 10, "Top Products by Profit:", ln=True)
-
-    top_products = (
-        filtered_df.groupby("Product")["Profit"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(5)
-    )
-
-    for product, profit in top_products.items():
-        pdf.cell(200, 10, f"{product}: ₹{profit:,.0f}", ln=True)
-
-    file_path = "sales_report.pdf"
-    pdf.output(file_path)
-    return file_path
-
-if st.button("📥 Generate PDF Report"):
-    pdf_file = generate_pdf()
-    with open(pdf_file, "rb") as f:
-        st.download_button(
-            "⬇ Download PDF",
-            f,
-            file_name="sales_report.pdf",
-            mime="application/pdf"
-        )
+with st.expander("📄 View Filtered Raw Data"):
+    st.dataframe(filtered_df)
 
 # -------------------------------------
-# LOGOUT
+# Download Data
 # -------------------------------------
-st.sidebar.markdown("---")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
+st.subheader("⬇ Download Filtered Data")
+
+csv = filtered_df.to_csv(index=False).encode("utf-8")
+st.download_button(
+    "Download CSV",
+    csv,
+    "filtered_sales_data.csv",
+    "text/csv"
+)
 
 # -------------------------------------
-# FOOTER
+# Footer
 # -------------------------------------
 st.markdown("---")
 st.markdown("✅ Built with **Python, Pandas, NumPy, Matplotlib & Streamlit**")
+
